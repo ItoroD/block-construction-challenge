@@ -14,7 +14,9 @@ public class Main {
 
     Map<String, Double> feeRateMap = new HashMap<>();
 
-    private void readCSVFile(String csvFile){
+    Set<String> visited = new HashSet<>();
+
+    private void readCSVFile(String csvFile){ //this reads in the csv and calls the processtransaction method
 
         String line = "";
         String csvSplitBy = ",";
@@ -28,14 +30,13 @@ public class Main {
                 List<String> parentsTxId = values.length > 3 && values[3] != "" ? Arrays.asList(values[3].split(";")) : null;
                 Transaction tx = new Transaction(txId,fee,weight,parentsTxId);
                 processTransactions(tx);
-                //System.out.println("Column 1: " + values[0] + ", Column 2: " + values[1]);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void processTransactions(Transaction tx){
+    private void processTransactions(Transaction tx){ // here we put all the transactions from csv into Hashmap, we also create a parent Map
 //        long fee = tx.getFee();
 //        long weight = tx.getWeight();
         List<String> parentsTxIds = tx.getParentsTxIdList();
@@ -48,16 +49,17 @@ public class Main {
                 parentsMap.put(parentId, null);
             }
         }
-        //System.out.println(parentsMap);
-
     }
 
-    private void processParentTransactions(){
+
+
+    private void processParentTransactions(){ // here we set the weigh and fee for each parent in the parentmap. We remove all transactions that are parents from the transaction map so that we dont double count
         //System.out.println(parentsMap);
         for (Map.Entry<String, Transaction> entry : txMap.entrySet()) {
             //System.out.println(entry.getKey());
             if(parentsMap.containsKey(entry.getKey())){ //the transaction we are looking at is a parent tx
                 //System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+
                 Transaction tx = entry.getValue();
                 double fee = tx.getFee();
                 double weight = tx.getWeight();
@@ -65,34 +67,49 @@ public class Main {
                 parentsMap.put(entry.getKey(), feeAndWeight);
             }
         }
+    }
 
-        //now remove parent transactions from the txMap
-        for (Map.Entry<String, Double[]> entry : parentsMap.entrySet()) {
-            //System.out.println(entry.getKey());
-            if(txMap.containsKey(entry.getKey())){ //the transaction we are looking at is a parent tx
-                txMap.remove(entry.getKey());
+    private double getTotalFee(String txId){
+        Transaction tx = txMap.get(txId);
+        List<String> nextParentList = tx.parentsTxIdList;
+        double totalFee = tx.getFee();
+
+        if(nextParentList != null){
+            for(String parentTxId: nextParentList) {
+                totalFee += getTotalFee(parentTxId);
             }
         }
 
-        //now if we see a transaction that is a parent who has a parent, lets update the parent map with its parent and also add the cumulative fee and weight
-
+        return totalFee;
     }
 
-    private Map<String, Double> calculateFeeRate(){
+    public double getTotalWeight(String txId) {
+        Transaction tx = txMap.get(txId);
+        List<String> nextParentList = tx.parentsTxIdList;
+        visited.add(txId);
+        double totalWeight = tx.getWeight();
+
+        if(nextParentList != null){
+            for(String parentTxId: nextParentList) {
+                totalWeight += getTotalWeight(parentTxId);
+            }
+        }
+
+
+        return totalWeight;
+    }
+
+    private Map<String, Double> calculateFeeRate(){ //here we pick a tx, get its fee and weight by summing up that of its parent
         double feeRate;
         for (Map.Entry<String, Transaction> entry : txMap.entrySet()) {
             Transaction tx = entry.getValue();
-            double fee = entry.getValue().getFee();
-            double weight = entry.getValue().getWeight();
-            String txId = entry.getValue().getTxId();
-
-            if(entry.getValue().getParentsTxIdList() != null){
-                for(String parent : entry.getValue().getParentsTxIdList()){
-                    Double[] feeAndWeight = parentsMap.get(parent);
-                    fee += feeAndWeight[0];
-                    weight += feeAndWeight[1];
-                }
+            String txId = tx.getTxId();
+            if(visited.contains(txId)){
+                continue;
             }
+
+            double fee = getTotalFee(txId);
+            double weight = getTotalWeight( txId);
             feeRate = fee/weight;
             feeRateMap.put(txId, feeRate);
             tx.setFee(fee);
@@ -104,9 +121,9 @@ public class Main {
 
     public static void main(String[] args) {
         Main tx = new Main();
-        String filePath = "C:\\Users\\itoro\\IdeaProjects\\block-construction\\src\\main\\resources\\test.csv";
+        String filePath = "C:\\Users\\itoro\\IdeaProjects\\block-construction\\src\\main\\resources\\mempool.csv";
         tx.readCSVFile(filePath);
-        tx.processParentTransactions();
+        //tx.processParentTransactions();
         Map<String, Double> feeRateMap = tx.calculateFeeRate();
 
         // Create a list from elements of HashMap
@@ -123,7 +140,12 @@ public class Main {
             sortedMap.put(entry.getKey(), entry.getValue());
         }
 
+        int totalWeight = 4_000_000;
+        int weightSoFar = 0;
         for (Map.Entry<String, Double> entry : sortedMap.entrySet()) {
+            weightSoFar += tx.txMap.get(entry.getKey()).getWeight();
+            if(weightSoFar > totalWeight) //check that out block has not exceeded maximum.
+                break;
             List<String> parentsTxIds = tx.txMap.get(entry.getKey()).getParentsTxIdList();
             if(parentsTxIds != null){
                 for(String parent : parentsTxIds){
@@ -131,7 +153,7 @@ public class Main {
                 }
             }
             System.out.println(entry.getKey());
-            //sortedMap.put(entry.getKey(), entry.getValue());
+
         }
     }
 }
