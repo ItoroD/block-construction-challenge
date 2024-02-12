@@ -3,16 +3,13 @@ package org.example;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 // Press Shift twice to open the Search Everywhere dialog and type `show whitespaces`,
 // then press Enter. You can now see whitespace characters in your code.
 public class Main {
 
-    Map<String, Long[]> parentsMap = new HashMap<>();
+    Map<String, Double[]> parentsMap = new HashMap<>();
     Map<String, Transaction> txMap = new HashMap<>();
 
     Map<String, Double> feeRateMap = new HashMap<>();
@@ -26,8 +23,9 @@ public class Main {
 
                 // use comma as separator
                 String[] values = line.split(csvSplitBy);
-                String txId = values[0]; long fee = Long.parseLong(values[1]); long weight = Long.parseLong(values[2]);
-                List<String> parentsTxId = values[3] != "" ? Arrays.asList(values[3].split(";")) : null;
+                String txId = values[0]; double fee = Double.parseDouble(values[1]); double weight = Double.parseDouble(values[2]);
+
+                List<String> parentsTxId = values.length > 3 && values[3] != "" ? Arrays.asList(values[3].split(";")) : null;
                 Transaction tx = new Transaction(txId,fee,weight,parentsTxId);
                 processTransactions(tx);
                 //System.out.println("Column 1: " + values[0] + ", Column 2: " + values[1]);
@@ -55,21 +53,21 @@ public class Main {
     }
 
     private void processParentTransactions(){
-        System.out.println(parentsMap);
+        //System.out.println(parentsMap);
         for (Map.Entry<String, Transaction> entry : txMap.entrySet()) {
             //System.out.println(entry.getKey());
             if(parentsMap.containsKey(entry.getKey())){ //the transaction we are looking at is a parent tx
-                System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
+                //System.out.println("Key: " + entry.getKey() + ", Value: " + entry.getValue());
                 Transaction tx = entry.getValue();
-                long fee = tx.getFee();
-                long weight = tx.getWeight();
-                Long[] feeAndWeight = {fee,weight};
+                double fee = tx.getFee();
+                double weight = tx.getWeight();
+                Double[] feeAndWeight = {fee,weight};
                 parentsMap.put(entry.getKey(), feeAndWeight);
             }
         }
 
         //now remove parent transactions from the txMap
-        for (Map.Entry<String, Long[]> entry : parentsMap.entrySet()) {
+        for (Map.Entry<String, Double[]> entry : parentsMap.entrySet()) {
             //System.out.println(entry.getKey());
             if(txMap.containsKey(entry.getKey())){ //the transaction we are looking at is a parent tx
                 txMap.remove(entry.getKey());
@@ -83,31 +81,58 @@ public class Main {
     private Map<String, Double> calculateFeeRate(){
         double feeRate;
         for (Map.Entry<String, Transaction> entry : txMap.entrySet()) {
-            long fee = entry.getValue().getFee();
-            long weight = entry.getValue().getWeight();
+            Transaction tx = entry.getValue();
+            double fee = entry.getValue().getFee();
+            double weight = entry.getValue().getWeight();
             String txId = entry.getValue().getTxId();
 
             if(entry.getValue().getParentsTxIdList() != null){
                 for(String parent : entry.getValue().getParentsTxIdList()){
-                    Long[] feeAndWeight = parentsMap.get(parent);
+                    Double[] feeAndWeight = parentsMap.get(parent);
                     fee += feeAndWeight[0];
                     weight += feeAndWeight[1];
                 }
             }
             feeRate = fee/weight;
             feeRateMap.put(txId, feeRate);
-
-
+            tx.setFee(fee);
+            tx.setWeight(weight);
+            txMap.put(txId, tx); //update with new weights and fee sum from all parents
         }
         return feeRateMap;
     }
 
     public static void main(String[] args) {
         Main tx = new Main();
-        String filePath = "C:\\Users\\itoro\\IdeaProjects\\block-construction\\src\\main\\resources\\mempool.csv";
+        String filePath = "C:\\Users\\itoro\\IdeaProjects\\block-construction\\src\\main\\resources\\test.csv";
         tx.readCSVFile(filePath);
         tx.processParentTransactions();
-        tx.calculateFeeRate();
+        Map<String, Double> feeRateMap = tx.calculateFeeRate();
+
+        // Create a list from elements of HashMap
+        List<Map.Entry<String, Double>> list = new LinkedList<>(feeRateMap.entrySet());
+
+        Collections.sort(list, new Comparator<Map.Entry<String, Double>>() {
+            public int compare(Map.Entry<String, Double> o1, Map.Entry<String, Double> o2) {
+                return (o2.getValue()).compareTo(o1.getValue());
+            }
+        });
+
+        HashMap<String, Double> sortedMap = new LinkedHashMap<>();
+        for (Map.Entry<String, Double> entry : list) {
+            sortedMap.put(entry.getKey(), entry.getValue());
+        }
+
+        for (Map.Entry<String, Double> entry : sortedMap.entrySet()) {
+            List<String> parentsTxIds = tx.txMap.get(entry.getKey()).getParentsTxIdList();
+            if(parentsTxIds != null){
+                for(String parent : parentsTxIds){
+                    System.out.println(parent);
+                }
+            }
+            System.out.println(entry.getKey());
+            //sortedMap.put(entry.getKey(), entry.getValue());
+        }
     }
 }
 

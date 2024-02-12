@@ -4,11 +4,11 @@ import java.util.List;
 
 public class Transaction {
     String txId;
-    long fee;
-    long weight;
+    double fee;
+    double weight;
     List<String> parentsTxIdList;
 
-    public Transaction(String txId, long fee, long weight, List<String> parentsTxIdList) {
+    public Transaction(String txId, double fee, double weight, List<String> parentsTxIdList) {
         this.txId = txId;
         this.fee = fee;
         this.weight = weight;
@@ -27,19 +27,19 @@ public class Transaction {
         this.txId = txId;
     }
 
-    public long getFee() {
+    public double getFee() {
         return fee;
     }
 
-    public void setFee(long fee) {
+    public void setFee(double fee) {
         this.fee = fee;
     }
 
-    public long getWeight() {
+    public double getWeight() {
         return weight;
     }
 
-    public void setWeight(long weight) {
+    public void setWeight(double weight) {
         this.weight = weight;
     }
 
