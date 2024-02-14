@@ -140,6 +140,8 @@ public class Main {
             sortedMap.put(entry.getKey(), entry.getValue());
         }
 
+        Set<String> alreadyPrinted = new HashSet();
+
         int totalWeight = 4_000_000;
         int weightSoFar = 0;
         for (Map.Entry<String, Double> entry : sortedMap.entrySet()) {
@@ -149,10 +151,16 @@ public class Main {
             List<String> parentsTxIds = tx.txMap.get(entry.getKey()).getParentsTxIdList();
             if(parentsTxIds != null){
                 for(String parent : parentsTxIds){
+                    if(alreadyPrinted.contains(parent)) //if parent already printed continue
+                        continue;
                     System.out.println(parent);
+                    alreadyPrinted.add(parent);
                 }
             }
-            System.out.println(entry.getKey());
+            if(!alreadyPrinted.contains(entry.getKey())){//if tx is not printed, print it and add it to already printed
+                System.out.println(entry.getKey());
+                alreadyPrinted.add(entry.getKey());
+            }
 
         }
     }
